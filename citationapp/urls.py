@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path
 from ninja import NinjaAPI, Schema
 from ninja.security import HttpBearer
-from user.models import User
+from django.contrib.auth.hashers import check_password
 from jwt import encode, PyJWTError, decode
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -11,7 +11,7 @@ from pydantic import SecretStr
 from django.db.utils import IntegrityError
 
 from citation.models import Citation
-from user.models import User, Clerk
+from user.models import User, Officer
 
 class TokenPayload(Schema):
     user_id: int = None
@@ -74,21 +74,6 @@ api = NinjaAPI(
 
 # Django Ninja schemas ------------------------------------------------------
 
-
-class UserSchema(Schema):
-    agency: str
-    email: str
-    password: str
-    name: str
-    badge: int
-
-class getUserSchema(Schema):
-    id: int
-    agency: str
-    email: str
-    name: str
-    badge: int
-
 class ClerkSchema(Schema):
     agency: str
     email: str
@@ -100,6 +85,20 @@ class getClerkSchema(Schema):
     agency: str
     email: str
     name: str
+
+class OfficerSchema(Schema):
+    agency: str
+    email: str
+    password: str
+    name: str
+    badge: int
+
+class getOfficerSchema(Schema):
+    id: int
+    agency: str
+    email: str
+    name: str
+    badge: int
 
 class LoginSchema(Schema):
     email: str
@@ -129,7 +128,7 @@ class CitationSchema(Schema):
     vehicle_type: str
     vehicle_vin: str
     vehicle_color: str
-    vehicle_year = int
+    vehicle_year: int
     vehicle_make: str
     vehicle_model: str
     factor_crash: bool
@@ -176,7 +175,7 @@ class getCitationSchema(Schema):
     vehicle_type: str
     vehicle_vin: str
     vehicle_color: str
-    vehicle_year = int
+    vehicle_year: int
     vehicle_make: str
     vehicle_model: str
     factor_crash: bool
@@ -200,11 +199,54 @@ class getCitationSchema(Schema):
 
 # User routes ---------------------------------------------------------------
 
-# User creation
-@api.post('/create-user', auth=None)
-def create_user_api(request, payload: UserSchema):
+# Clerk creation
+@api.post('/create-clerk/', auth=None)
+def create_clerk_api(request, payload: ClerkSchema):
     """
         Create a new user using email and password.
+
+        Password constrains:
+
+            - At least 10 characters long.
+
+            - Should include one lowercase letter.
+
+            - Should include one UPPERCASE letter.
+
+            - Should include one of these special characters: ! @ # ? ]
+
+    """
+    try:
+        extrafields = {
+            'agency': payload.agency,
+            'name': payload.name,
+        }
+
+        user = User.objects.create_user(
+            payload.email,
+            payload.password,
+            **extrafields,
+        )
+
+    except IntegrityError:
+        return api.create_response(
+            request,
+            {"error": "Email already exists"},
+            status=409,
+        )
+
+    return {
+        "type": "clerk",
+        "id": user.id,
+        "email": user.email,
+        }
+
+
+# Officer creation
+@api.post('/create-officer/', auth=None)
+def create_officer_api(request, payload: OfficerSchema):
+    """
+        Create a new Officer using email and password.
 
         Password constrains:
 
@@ -224,10 +266,9 @@ def create_user_api(request, payload: UserSchema):
             'badge': payload.badge,
         }
 
-        user = User.objects.create_user(
+        officer = Officer.objects.create(
             payload.email,
             payload.password,
-            **extrafields,
         )
 
     except IntegrityError:
@@ -239,51 +280,82 @@ def create_user_api(request, payload: UserSchema):
 
     return {
         "type": "officer",
-        "id": user.id,
-        "email": user.email,
+        "id": officer.id,
+        "email": officer.email,
         }
 
-
-# Clerk creation
-@api.post('/create-clerk', auth=None)
-def create_clerk_api(request, payload: ClerkSchema):
-    """
-        Create a new Clerk using email and password.
-
-        Password constrains:
-
-            - At least 10 characters long.
-
-            - Should include one lowercase letter.
-
-            - Should include one UPPERCASE letter.
-
-            - Should include one of these special characters: ! @ # ? ]
-
-    """
+# Login
+@api.post('/login', auth=None)
+def user_login(request, payload: LoginSchema):
+    """Login using email and password"""
     try:
-        extrafields = {
-            'agency': payload.agency,
-            'name': payload.name,
-        }
+        user = User.objects.get(email=payload.email)
 
-        clerk = Clerk.objects.create_clerk(
-            payload.email,
-            payload.password,
-        )
-
-    except IntegrityError:
+    except Exception:
         return api.create_response(
             request,
-            {"error": "Email already exists"},
-            status=409,
-        )
+            {"error": "User not found"},
+            status=404)
 
+    if check_password(payload.password.get_secret_value(), user.password):
+        return AccessToken.create(user)
+
+# Citation creation
+@api.post("/citation/")
+def create(request, payload:CitationSchema):
+    """Create a citation form"""
+    citation_form = {
+        'clerk': request.auth,
+        'violation_datetime': payload.violation_datetime,
+        'violation_route': payload.violation_route,
+        'violation_county': payload.violation_county,
+        'violation_city': payload.violation_city,
+        'contact_type': payload.contact_type,
+        'oln_state': payload.oln_state,
+        'oln': payload.oln,
+        'oln_class': payload.oln_class,
+        'cdl': payload.cdl,
+        'violator_name': payload.violator_name,
+        'violator_dob': payload.violator_dob,
+        'violator_gender': payload.violator_gender,
+        'violator_hair': payload.violator_hair,
+        'violator_eyes': payload.violator_eyes,
+        'violator_height': payload.violator_height,
+        'violator_address': payload.violator_address,
+        'violator_city': payload.violator_city,
+        'violator_state': payload.violator_state,
+        'violator_phone': payload.violator_phone,
+        'violator_email': payload.violator_email,
+        'vehicle_type': payload.vehicle_type,
+        'vehicle_vin': payload.vehicle_vin,
+        'vehicle_color': payload.vehicle_color,
+        'vehicle_year': payload.vehicle_year,
+        'vehicle_make': payload.vehicle_make,
+        'vehicle_model': payload.vehicle_model,
+        'factor_crash': payload.factor_crash,
+        'factor_passenger': payload.factor_passenger,
+        'factor_spanish': payload.factor_spanish,
+        'factor_car_cam': payload.factor_car_cam,
+        'factor_body_cam': payload.factor_body_cam,
+        'factor_school_zone': payload.factor_school_zone,
+        'factor_construction': payload.factor_construction,
+        'factor_workers': payload.factor_workers,
+        'violation_0': payload.violation_0,
+        'violation_1': payload.violation_1,
+        'violation_2': payload.violation_2,
+        'violation_3': payload.violation_3,
+        'violation_4': payload.violation_4,
+        'issued_by': payload.issued_by,
+        'issued_datetime': payload.issued_datetime,
+        'court': payload.court,
+        'court_appearance_date': payload.court_appearance_date,
+        'violator_signature': payload.violator_signature,
+    }
+    citation = Citation.objects.create(**citation_form)
     return {
-        "type": "clerk",
-        "id": clerk.id,
-        "email": clerk.email,
-        }
+        "item": "citation",
+        "id": citation.id
+    }
 
 urlpatterns = [
     path('admin/', admin.site.urls),

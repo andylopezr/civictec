@@ -128,7 +128,7 @@ class Citation(models.Model):
     violation_3 = models.CharField(max_length=255, choices=V_L, default="FTA")
     violation_4 = models.CharField(max_length=255, choices=V_L, default="FTA")
     issued_by = models.CharField(max_length=255)
-    officer = models.ForeignKey(User, on_delete=models.CASCADE)
+    clerk = models.ForeignKey(User, on_delete=models.CASCADE)
     issued_datetime = models.DateTimeField(default=datetime.today)
     court = models.CharField(max_length=255)
     court_appearance_date = models.DateTimeField(default=datetime.today)
