@@ -54,21 +54,6 @@ class AccessToken:
             "access_token": token,
         }
 
-
-    @staticmethod
-    def create(clerk: Clerk) -> dict:
-        email = clerk.email
-        access_token_expires = timedelta(minutes=999999)
-        token = AccessToken.create_token(
-            data={"sub": email},
-            expires_delta=access_token_expires,
-        )
-        clerk.save()
-        return {
-            "email": email,
-            "access_token": token,
-        }
-
     @staticmethod
     def create_token(data: dict, expires_delta: timedelta = None) -> str:
         to_encode = data.copy()
