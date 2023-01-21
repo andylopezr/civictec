@@ -100,6 +100,12 @@ class getOfficerSchema(Schema):
     badge: int
 
 
+class updateOfficerSchema(Schema):
+    password: str
+    name: str
+    badge: int
+
+
 class getUserSchema(Schema):
     id: int
     name: str
@@ -350,36 +356,29 @@ def get_user(request, user_id: int):
             status=404)
 
 
-# TODO: Fix bug where update does not meet the user creation requirements
 # Update Officer
-# @api.put('/users/{user_id}')
-# def update_user(request, user_id: int, payload: OfficerSchema):
-#     """Update user attributes"""
-#     officer = get_object_or_404(User, id=user_id)
+@api.put('/officers/{officer_id}')
+def update_officer(request, officer_id: int, payload: updateOfficerSchema):
+    """Update Officer attributes"""
+    officer = get_object_or_404(Officer, id=officer_id)
 
-#     for attr, value in payload.dict().items():
-#         setattr(officer, attr, value)
-#     if request.auth.role == "CLERK" or request.auth.id == officer.id:
-#         officer.save()
-#     return api.create_response(
-#             request,
-#             {"message": "Updated successfully"},
-#             status=204)
+    if (request.auth.role == "CLERK") or (request.auth.id == officer_id):
 
-@api.put('/users/{user_id}', auth=None)
-def update_user(request, user_id: int, payload: OfficerSchema):
-    """Update user attributes"""
-    officer = get_object_or_404(Officer, id=user_id)
-    officer.name = payload.name
-    officer.email = payload.email
-    officer.password = payload.password
-    officer.badge = payload.badge
-    officer.save()
+        for attr, value in payload.dict().items():
+            setattr(officer, attr, value)
+            if payload.password:
+                officer.set_password(payload.password)
+        officer.save()
+        return api.create_response(
+                request,
+                {"message": "Updated successfully"},
+                status=204)
 
-    return api.create_response(
+    else:
+        return api.create_response(
             request,
-            {"message": "Updated successfully"},
-            status=204)
+            {"error": "Unauthorized"},
+            status=401)
 
 
 # Delete user

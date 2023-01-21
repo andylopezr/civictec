@@ -91,11 +91,6 @@ class User(AbstractUser):
 
     objects = UserManager()
 
-    def save(self, *args, **kwargs):
-        if not self.pk:
-            self.agency = self.agency
-            return super().save(*args, **kwargs)
-
 
 class Clerk(User):
 
