@@ -366,13 +366,16 @@ def get_user(request, user_id: int):
 #             {"message": "Updated successfully"},
 #             status=204)
 
-@api.put('/users/{user_id}')
+@api.put('/users/{user_id}', auth=None)
 def update_user(request, user_id: int, payload: OfficerSchema):
     """Update user attributes"""
-    user = get_object_or_404(Officer, id=user_id)
-    for attr, value in payload.dict().items():
-        setattr(user, attr, value)
-    user.save()
+    officer = get_object_or_404(Officer, id=user_id)
+    officer.name = payload.name
+    officer.email = payload.email
+    officer.password = payload.password
+    officer.badge = payload.badge
+    officer.save()
+
     return api.create_response(
             request,
             {"message": "Updated successfully"},
@@ -390,11 +393,13 @@ def delete_user(request, user_id: int):
             {"message": "Deleted successfully"},
             status=204)
 
+# Citation routes -----------------------------------------------------------
+
 
 # Citation creation
 @api.post("/citation/")
 def create(request, payload: CitationSchema):
-    """Create a citation form"""
+    """Create a Citation form"""
 
     if request.auth.role == "CLERK":
         return api.create_response(
@@ -459,21 +464,42 @@ def create(request, payload: CitationSchema):
 
 
 # List Agency Citations
-@api.get('/list_citations', response=List[getCitationSchema])
+@api.get('/list_citations/', response=List[getCitationSchema])
 @paginate
 def get_citations(request):
     """List all Agency Citations"""
-    citations = Citation.objects.filter(citation_agency=request.auth.agency)
-    return citations
+    if request.auth.role == "CLERK":
+        citation = Citation.objects.filter(citation_agency=request.auth.agency)
+        return citation
+    else:
+        return api.create_response(
+            request,
+            {"error": "Unauthorized"},
+            status=401)
 
 
 # List Officer Citations
-@api.get('/list_officer_citations', response=List[getCitationSchema])
+@api.get('/list_officer_citations/', response=List[getCitationSchema])
 @paginate
 def get_officer_citations(request):
     """List Citations made by the logged Officer"""
     citations = Citation.objects.filter(officer=request.auth)
     return citations
+
+
+# An Officer can delete his own Citation
+@api.delete("/citation/{citation_id}")
+def delete_citation(request, citation_id: int):
+    """Delete a Citation"""
+    try:
+        citation = Citation.objects.get(id=citation_id, user=request.auth)
+        citation.delete()
+
+    except Exception:
+        return api.create_response(
+            request,
+            {"error": "Unauthorized"},
+            status=401)
 
 
 urlpatterns = [
