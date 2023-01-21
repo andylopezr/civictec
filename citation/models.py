@@ -1,6 +1,6 @@
 from django.db import models
-from datetime import datetime, date
-from user.models import User
+from datetime import datetime
+from user.models import Officer
 
 
 class Citation(models.Model):
@@ -98,7 +98,7 @@ class Citation(models.Model):
     oln_class = models.CharField(max_length=3, choices=ONL_T, default="EDL")
     cdl = models.BooleanField(choices=YES_NO, default=False)
     violator_name = models.CharField(max_length=255)
-    violator_dob = models.DateField(default=date.today)
+    violator_dob = models.DateTimeField(default=datetime.today)
     violator_gender = models.CharField(max_length=1, choices=M_F, default="M")
     violator_hair = models.CharField(max_length=2, choices=COLOR, default="BR")
     violator_eyes = models.CharField(max_length=2, choices=COLOR, default="BR")
@@ -128,7 +128,8 @@ class Citation(models.Model):
     violation_3 = models.CharField(max_length=255, choices=V_L, default="FTA")
     violation_4 = models.CharField(max_length=255, choices=V_L, default="FTA")
     issued_by = models.CharField(max_length=255)
-    clerk = models.ForeignKey(User, on_delete=models.CASCADE)
+    officer = models.ForeignKey(Officer, on_delete=models.CASCADE)
+    citation_agency = models.CharField(max_length=255)
     issued_datetime = models.DateTimeField(default=datetime.today)
     court = models.CharField(max_length=255)
     court_appearance_date = models.DateTimeField(default=datetime.today)
